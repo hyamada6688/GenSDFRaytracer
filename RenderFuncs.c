@@ -129,11 +129,33 @@ double genSDFbox(struct vec3 *normals[3], struct vec3 *corner, double dims[3], s
 	
 }
 
+struct vec3 *boxGrad(struct vec3 *normals[3], struct vec3 *corner, double dims[3], struct vec3 *p){
+	struct vec3 *a = vecsubtract(p, corner);
+	struct vec3 *grad = newVec(0,0,0);
+	struct vec3 *newGrad = grad;
+	struct vec3 *proj;
+	int count = 0;
+	for (int i =0; i < 3; i++){
+		//if (dims[i] <= dot3(a, normals[i]) && dot3(a, normals[i]) >= 0 ){
+		if (dot3(normals[i],a) >= -0.00000001 || dot3(normals[i],a) <= -1*dims[i]) {
+			count++;
+			//printf("|proj : %f,%f,%f ", proj->x, proj->y, proj->z);
+			grad  = vecadd(grad, normals[i]);
+			//free(grad);
+			//free(proj);
+		}
+	}
+	if (count == 0) return newGrad; 
+	return normalize(grad);
+}
+
 struct vec3 *shade(struct Camera *camera, struct vec3 *v, struct vec3 *pos, struct SD *sd){
 	if (sd->dist == 1111.1) return newVec(0, 0, 0);
-	struct vec3 *contact = vecadd(pos, vecmult(sd->dist, v));
+	struct vec3 *direct = vecmult(sd->dist, v);
+	struct vec3 *contact = vecadd(pos, direct);
+	free(direct);
 	struct vec3 *lightnorm =  normalize(vecsubtract(camera->light, contact));
-	struct vec3 *grad = sd->gradient(pos);
+	struct vec3 *grad = sd->gradient(contact);
 	double scale = dot3(grad, lightnorm);
 	if (scale < 0) scale = 0;
 	struct vec3 *shade = vecmult(scale, sd->color);
@@ -175,6 +197,7 @@ void newNode(struct Node *head, struct Shape *shape){
 	}
 	cur->next = malloc(sizeof(struct Node));
 	cur->next->shape = shape;
+	cur->next->next = 0;
 }
 
 struct Shape *newShape(struct vec3 *color){
@@ -191,7 +214,7 @@ int Render(struct Node *head, struct Camera *camera, double hsteps, double vstep
 	center->y = 0.0;
 	center->z = 2.0;
 	double radius = 2;*/
-
+	//fprintf(fp, "a");
 	printf("MadeItHere\n");
 	struct vec3 *sheetpoint;
 	struct vec3 *k = vecsubtract(camera->corner[1], camera->corner[0]);
@@ -202,6 +225,7 @@ int Render(struct Node *head, struct Camera *camera, double hsteps, double vstep
 	struct SD *sdcur;
 	struct vec3 *curcolor;
 	struct vec3 *hraw;
+	struct vec3 *pointon;
 	//fprintf(fp, "[");
 	for (int i = 0; i < vsteps; i ++){
 		hraw = vecmult(((double) i)/((double) vsteps), h);
@@ -212,25 +236,30 @@ int Render(struct Node *head, struct Camera *camera, double hsteps, double vstep
 			know = vecmult(((double) j)/((double) hsteps), k);
 			sheetpoint = vecadd(hnow, know);
 			v = normalize(vecsubtract(sheetpoint, camera->focus));
-			//sdcur = calcSDF(head, v, camera->focus);
-			//curcolor = shade(camera, v, camera->focus, sdcur);
-			//if (j == 0) fprintf(fp, "%f, %f, %f", curcolor->x, curcolor->y, curcolor->z);
-			//else fprintf(fp, ";%f, %f, %f", curcolor->x, curcolor->y, curcolor->z);
+			sdcur = calcSDF(head, v, camera->focus);
+			curcolor = shade(camera, v, camera->focus, sdcur);
+			if (j == 0) fprintf(fp, "%f,%f,%f", curcolor->x, curcolor->y, curcolor->z);
+			else fprintf(fp, ";%f,%f,%f", curcolor->x, curcolor->y, curcolor->z);
+			pointon = sdcur->gradient(vecadd(camera->focus, vecmult(sdcur->dist, v)));
 			//if (curcolor->y != 0) printf("o");
 			//else printf(" ");
-			if (head->shape->SDF(v,camera->focus) != 1111.1) printf("o");
-                        else printf(".");
+			//printf("%f\n", curcolor->y);
+			//if (curcolor->y != 0 && !isnan(curcolor->y)) printf("o %f,%f,%f\n", pointon->x, pointon->y, pointon->z);
+			//else if (isnan(curcolor->y)) printf("* %f,%f,%f\n", pointon->x, pointon->y, pointon->z);
+                        if (curcolor->y != 0 && !isnan(curcolor->y)) printf("o ");
+			else if (isnan(curcolor->y)) printf("* ");
+			else printf(". ");
 			//free(sheetpoint);
 			//free(know);
 			//free(v);
 			//free(curcolor);
 		}
 		printf("\n");
-		//fprintf(fp, ";\n");
-		//fprintf(fp, "\n");
+		fprintf(fp, ";\n");
+		fprintf(fp, "\n");
 		//free(hnow);
 	}	
-	//fprintf(fp, "\n");
+	fprintf(fp, "\n");
 	printf("\n");
 	free(h);
 	free(k);

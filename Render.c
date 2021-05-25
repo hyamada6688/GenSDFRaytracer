@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "SDF.h"
-
+//#include <GLUS.h>
 
 /*struct Camera *newCam(struct vec3 *focus, struct vec3 *corner[4]);
 
@@ -20,6 +20,8 @@ double genSDFsphere(struct vec3 *center, double r, struct vec3 *v, struct vec3 *
 int Render(struct Node *head, struct Camera *camera, double hsteps, double vsteps, FILE *fp);
 
 double genSDFbox(struct vec3 *normals[3], struct vec3 *corner, double dims[3], struct vec3 *v, struct vec3 *p);
+
+struct vec3 *boxGrad(struct vec3 *normals[3], struct vec3 *corner, double dims[3], struct vec3 *p);
 
 /*int main(int argc, char *argv[]){
 	
@@ -49,7 +51,7 @@ double genSDFbox(struct vec3 *normals[3], struct vec3 *corner, double dims[3], s
 }*/
 
 double circleSDF(struct vec3 *v, struct vec3 *p){
-        return genSDFsphere(newVec(0.0, 0.0, 1.0), 1.0, v, p);
+        return genSDFsphere(newVec(0.0, 0.0, 1.7), 1.7, v, p);
 }
 
 
@@ -76,6 +78,25 @@ double boxSDF(struct vec3 *v, struct vec3 *p){
 	return result;
 }
 
+struct vec3 *boxSDFgrad(struct vec3 *p){
+	struct vec3 *n1 = normalize(newVec(1.0,-1.0,0.0));
+        struct vec3 *n2 = normalize(newVec(1.0,1.0,0.0));
+        struct vec3 *n3 = normalize(newVec(0.0,0.0,1.0));
+        struct vec3 *corn = newVec(0.0, 0.0, 1.7);
+        double dims[3] = {3.0, 3.0, 1.0};
+        struct vec3 *norms[3];
+        norms[0] = n1;
+        norms[1] = n2;
+        norms[2] = n3;
+        struct vec3 *result = boxGrad(norms, corn, dims, p);
+        free(n1);
+        free(n2);
+        free(n3);
+        //free(dims);
+        free(corn);
+        return result;
+}
+
 /*double boxGrad(struct vec3 *p){
 	if (dot3(p->x, newVec(1.1) <)
 }*/
@@ -94,13 +115,20 @@ int main(int argc, char *argv[]){
 	struct Node *head = malloc(sizeof(struct Node));
 	//struct Node *head;
 	head->next = 0;
-	head->shape = newShape(newVec(0.0, 0.0, 2.0));
-	//head->shape->SDF = circleSDF;
+	head->shape = newShape(newVec(0, 255, 0));
+	//head->shape->SDF = boxGrad;
 	head->shape->SDF = boxSDF;
-	head->shape->color = newVec(0, 255, 0);
-	head->shape->gradSDF = circleSDFGrad;
+	head->shape->gradSDF = boxSDFgrad;
+	//head->shape->gradSDF = circleSDFGrad;
 	//head->gradSDF = firstCirc;
-        struct Camera *camera = newCam(focus, corners, light);
+        
+	struct Shape *sphere = newShape(newVec(0, 255, 0));
+	sphere->SDF = circleSDF;
+	sphere->gradSDF = circleSDFGrad;
+	newNode(head, sphere);
+		
+
+	struct Camera *camera = newCam(focus, corners, light);
         //struct vec3 *center = newVec(0.0, 0.0, 2.0);
 	FILE *fp = fopen(argv[3], "wt");
 	//printf("HiHi\n");
