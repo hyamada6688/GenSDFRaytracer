@@ -564,7 +564,7 @@ struct Shape *newShape(struct vec3 *color){
 
 
 int Render(struct Node *head, struct Camera *camera, double hsteps, double vsteps, FILE *fp){
-	//fprintf(fp, "a");
+	fprintf(fp, "P3\n%d %d\n255\n", (int)hsteps, (int)vsteps);
 	struct vec3 *sheetpoint;
 	struct vec3 *k = vecsubtract(camera->corner[1], camera->corner[0]);
 	struct vec3 *h = vecsubtract(camera->corner[3], camera->corner[0]);
@@ -593,17 +593,18 @@ int Render(struct Node *head, struct Camera *camera, double hsteps, double vstep
 			curcolor = shade(head, camera, sdcur);
 //			if (dis != 1111.1 && curcolor->x == 0) printf("%f, %f, %f at %f, %f, %f\n", grad->x, grad->y, grad->z, pointon->x, pointon->y, pointon->z);
 //			if (dis != 1111.1) printf("%f\n", pointon->z);
-			if (j == 0) fprintf(fp, "%f,%f,%f", curcolor->x, curcolor->y, curcolor->z);
-			else fprintf(fp, ";%f,%f,%f", curcolor->x, curcolor->y, curcolor->z);
+			//if (j == 0) fprintf(fp, "%f,%f,%f", curcolor->x, curcolor->y, curcolor->z);
+			//else fprintf(fp, ";%f,%f,%f", curcolor->x, curcolor->y, curcolor->z);
+			if (j == 0) fprintf(fp, "%d %d %d\n", (int)curcolor->x, (int)curcolor->y, (int)curcolor->z);
+			else fprintf(fp, "%d %d %d\n", (int)curcolor->x, (int)curcolor->y, (int)curcolor->z);
 			if (dis != 1111.1) printf("* ");
                         else printf("  ");
 		}
 		printf("\n");
-		fprintf(fp, ";\n");
-		fprintf(fp, "\n");
-		//free(hnow);
+	//	fprintf(fp, ";\n");
+	//	fprintf(fp, "\n");
 	}	
-	fprintf(fp, "\n");
+	//fprintf(fp, "\n");
 	printf("\n");
 	free(h);
 	free(k);

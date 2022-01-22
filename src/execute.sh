@@ -2,6 +2,6 @@
 
 make
 
-./Tracer $1 $2 "../data/small.csv"
+./Tracer $1 $2 "../data/P.ppm"
 
-python3 imagize.py
+open ../data/P.ppm
