@@ -27,7 +27,7 @@ struct node *shape2 = malloc(sizeof(struct node));
 shape1->next = shape2;    //set shape2 to be the "next" of shape1
 
 
-The bash executable ./execute.sh <pixel width> <pixel height> can be used to compile and
+The bash executable ./execute.sh (pixel width) (pixel height) can be used to compile and
 run the code. The result is a temporary file of a rendered image, whose bitmap is saved 
 in data/small.csv. 
   
