@@ -22,11 +22,13 @@ typedef struct vec3 *(*r3r3)(struct vec3 *);
 
 typedef double (*r3r1)(struct vec3 *, struct vec3 *);
 
+typedef struct contact *(*evalfunc)(struct vec3 *, struct vec3 *);
 
 struct Shape {
         struct vec3 *color;
 	r3r3 gradSDF;
 	r3r1 SDF;
+	evalfunc eval;
 };
 
 /*struct Shape{
@@ -98,8 +100,16 @@ struct SD {
 	double dist;
 	r3r3 gradient;
 	struct vec3 *color;
+	struct vec3 *grad;
 };
 
+struct contact{
+	struct vec3 *p;
+	double dist;
+	struct vec3 *grad;
+};
+
+double max(double arr[]);
 
 int Render(struct Node *head, struct Camera *camera, double hsteps, double vsteps, FILE *fp);
 struct Camera *newCam(struct vec3 *focus, struct vec3 *corner[4], struct vec3 *light);
@@ -152,13 +162,20 @@ struct vec3 *boxGrad(struct vec3 *normals[3], struct vec3 *corner, double dims[3
 
 struct vec3 *RoundboxGrad(double r, struct vec3 *normals[3], struct vec3 *corner, double dims[3], struct vec3 *p);
 
-double cylSDF(struct vec3 *v, struct vec3 *p, struct vec3 *c, double r, struct vec3 *a, double h);
+double cylSDF(struct vec3 *v, struct vec3 *p, struct vec3 *c, double r, struct vec3 *a);
 
 struct vec3 *cylgrad(struct vec3 *p, struct vec3 *b, struct vec3 *a);
 
-double coneSDF(struct vec3 *v, struct vec3 *p, struct vec3 *b, struct vec3 *a, double h, double theta);
+struct contact *evalCylinder(struct vec3 *v, struct vec3 *p, struct vec3 *c, double r, struct vec3 *a, double h, struct vec3 *b);
 
+double coneSDF(struct vec3 *v, struct vec3 *p, struct vec3 *b, struct vec3 *a, double theta);
+
+struct vec3 *coneGrad(struct vec3 *p, struct vec3 *b, struct vec3 *a, double t);
 
 double prismSDF(struct vec3 *base, struct vec3 *a, struct vec3 *n0, int faces, double height, double facewidth, struct vec3 *v, struct vec3 *p);
 
 struct vec3 *prismGrad(struct vec3 *base, struct vec3 *a, struct vec3 *n0, int faces, double height, double facewidth, struct vec3 *p);
+
+double maxim(double arr[], int size);
+
+int valCompare(double a, double b);

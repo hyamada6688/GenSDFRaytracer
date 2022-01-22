@@ -7,6 +7,6 @@ RenderFuncs.o: renderFuncs.c SDF.h
 shapes.o: renderFuncs.c shapes.c SDF.h
 	gcc -c -g shapes.c
 
-Render.o: render.c SDF.h
+Render.o: render.c SDF.h shapes.h
 	gcc -c -g render.c
 

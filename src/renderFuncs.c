@@ -38,6 +38,13 @@ struct Plane *newPlane(struct vec3 *normal, struct vec3 *pointon){
 	return new;
 }
 
+double maxim(double arr[], int size){
+	double maxi=0;
+	for (int i = 0; i < size; i++) if (arr[i] > maxi) maxi = arr[i];
+	return maxi;
+	
+}
+
 double dot3(struct vec3 *v1, struct vec3 *v2){
         return  (v1->x * v2->x) + (v1->y * v2->y) + (v1->z * v2->z);
 }
@@ -107,6 +114,12 @@ struct vec3 *component(struct vec3 *pb, struct vec3 *a){
 	return vecmult(dot3(pb, a), a);
 }
 
+int valCompare(double a, double b){
+//	printf("%f\n", (a-b)*(a-b));
+	if ((a-b)*(a-b) < 0.000001 ) return 1;
+	else return 0;
+}
+
 double genSDFsphere(struct vec3 *center, double r, struct vec3 *v, struct vec3 *p){
         struct vec3 *a = vecsubtract(p, center);
         double result;
@@ -146,7 +159,6 @@ double genSDFbox(struct vec3 *normals[3], struct vec3 *corner, double dims[3], s
 	int zerocount = 0;
 	for (int i = 0; i < 3; i++){
 		if (dot3(onBox, normals[i]) >=  -1*dims[i] && dot3(onBox, normals[i]) <= 0.0001) truthCount++;
-		printf("%f\n", (dot3(onBox, normals[i])));
 	}
 	//printf("\n");
 	free(direct);
@@ -209,17 +221,58 @@ struct vec3 *RoundboxGrad(double r, struct vec3 *normals[3], struct vec3 *corner
         return normalize(grad);
 }
 
-double cylSDF(struct vec3 *v, struct vec3 *p, struct vec3 *c, double r, struct vec3 *a, double h){
-        struct vec3 *vperp = normalize(vecsubtract(v, vecmult(dot3(a,v),a)));
+double cylSDF(struct vec3 *v, struct vec3 *p, struct vec3 *c, double r, struct vec3 *a){
+        a = normalize(a);
+	struct vec3 *vperp = normalize(vecsubtract(v, vecmult(dot3(a,v),a)));
+	if (dot3(v, vperp)==0) return 1111.1;
         return genSDFsphere(c, r, vperp, p)/(dot3(v,vperp));
 }
 
 struct vec3 *cylgrad(struct vec3 *p, struct vec3 *b, struct vec3 *a){
+	a = normalize(a);
 	struct vec3 *pb = vecsubtract(p,b);
         return normalize(vecsubtract(pb, vecmult(dot3(pb,a), a)));
 }
 
-double coneSDF(struct vec3 *v, struct vec3 *p, struct vec3 *b, struct vec3 *a, double h, double theta){
+struct contact *evalCylinder(struct vec3 *v, struct vec3 *p, struct vec3 *c, double r, struct vec3 *a, double h, struct vec3 *b){
+	struct contact *point = malloc(sizeof(struct contact));
+	double d3;
+	a = normalize(a);
+        struct vec3 *vperp = normalize(vecsubtract(v, vecmult(dot3(a,v),a)));
+        if (dot3(v, vperp)==0) d3 = 1111.1;
+        else d3 = genSDFsphere(c, r, vperp, p)/(dot3(v,vperp));
+	double d1 = genSDFplane(a, vecadd(b, vecmult(h,a)), v, p);
+	double d2 = genSDFplane(vecmult(-1,a), b, v, p);
+	double SDFs[3] = {d1, d2, d3};
+	double maxi = maxim(SDFs, 3);
+	if (maxi == 1111.1) {
+		point->dist = 1111.1;
+		return point;
+	}
+	struct vec3 *pointOn = vecadd(vecmult(maxi, v), p);
+	if (maxi == d3 && dot3(vecsubtract(p, b),a)<=h && dot3(vecsubtract(p, b),a)>=0){
+		point->grad = normalize(antiComponent(vecsubtract(pointOn,b),a));
+		printf("Top cap : %f, Bottom cap: %f, cylinder : %f, maxi = %f\n", d1, d2, d3, maxi);
+		printf("%f %f %f\n", point->grad->x, point->grad->y, point->grad->z);
+		point->dist = d3;
+		printf("cylinderHIt");
+	}
+	else if (maxi == d3 || vecnorm(antiComponent(vecsubtract(pointOn, b), a)) > r){
+		point->dist = 1111.1;
+                return point;
+	}
+	else if (maxi ==d1 ){
+		point->grad = a;
+		point->dist = d1;
+	}
+	else{
+		point->grad = vecmult(-1,a);
+                point->dist = d2;
+	}
+	return point;
+}
+
+double coneSDF(struct vec3 *v, struct vec3 *p, struct vec3 *b, struct vec3 *a, double theta){
 	struct vec3 *dif = vecsubtract(p,b);
 	double al = dot3(dif, v);
 	double bet = dot3(dif,a);
@@ -227,22 +280,24 @@ double coneSDF(struct vec3 *v, struct vec3 *p, struct vec3 *b, struct vec3 *a, d
 	double d =vecnorm(dif);
 	double k = cos(theta);
 	free(dif);
-	return (k*k*al-bet*gam+2*k*sqrt(k*k*(al*al-d*d) + bet*bet + d*d*gam*gam - 2*al*bet*gam))/(gam*gam - k*k);
+	if (gam == k || (bet*bet - 2*al*bet*gam + al*al*k*k + d*d*(gam*gam-k*k)) < 0) return 1111.1;
+	//else return (k*k*al-bet*gam - 2*k*sqrt(k*k*(al*al-d*d) + bet*bet + d*d*gam*gam - 2*al*bet*gam))/(gam*gam - k*k);
+	else return (-bet*gam + al*k*k - fabs(k)*sqrt(bet*bet - 2*al*bet*gam + al*al*k*k + d*d*(gam*gam-k*k)))/(gam*gam - k*k);
 }
 
-/*struct vec3 *coneGrad(struct vec3 *p, struct vec3 *b, struct vec3 *a, double h, double theta){
+struct vec3 *coneGrad(struct vec3 *p, struct vec3 *b, struct vec3 *a, double theta){
 	struct vec3 *dif = vecsubtract(p,b);
 	struct vec3 *toax = antiComponent(dif, a);
-	double difa = dot3(dif, a);
-	struct vec3 *sincos = malloc(sizeof(struct vec3));
-	sincos->x = sin(theta);
-	sincos->y = cos(theta);
-	if (difa < 0) struct vec3 *grad = normalize(dif);
-	else if (0 < difa < h) {
-		struct vec3 *grad = malloc(sizeof(struct vec3));
-		grad->x = 2*costheta*dot3(p,
-	}
-}*/
+//	struct vec3 *grad = normalize(vecadd(vecmult(cos(theta),a), vecmult(sin(theta),toax)));
+//	if (dot3(dif, a) < h) return grad;
+//	else return a;
+	struct vec3 *tangent = cross3(a, toax);
+	struct vec3 *grad = normalize(cross3(dif, tangent));
+//	printf("%f, %f, %f\n", grad->x, grad->y, grad->z);
+//	printf("%f\n", dot3(grad, tangent));
+//	printf(" toax^2 = %f    tangent^2 = %f   Grad^2 = %f", dot3(toax,toax), dot3(tangent,tangent), dot3(grad, grad));
+	return grad;
+}
 
 double prismSDF(struct vec3 *base, struct vec3 *a, struct vec3 *n0, int faces, double height, double facewidth, struct vec3 *v, struct vec3 *p){
 	n0 = normalize(n0);
@@ -327,39 +382,114 @@ struct vec3 *prismGrad(struct vec3 *base, struct vec3 *a, struct vec3 *n0, int f
 	
 	return grad;
 }
-	
+
+/*struct contact *evalPrism(struct vec3 *base, struct vec3 *a, struct vec3 *n0, int faces, double height, double facewidth, struct vec3 *v, struct vec3 *p){
+	n0 = normalize(n0);
+	struct contact *result = malloc(sizeof(struct *contact));
+        struct vec3 *norm = malloc(sizeof(struct vec3));
+        struct vec3 *n1 = cross3(a, n0);
+        double max = -1111.1;
+        double curdist;
+        struct vec3 *pointon;
+        struct vec3 *directed;
+        int count = 0;
+        struct vec3 *b;
+        double thickness = facewidth/(2*tan(3.141592/faces));
+	double maxOff = -1*(height + 2*thickness);
+	struct vec3 *bestNorm;
+	struct vec3 *bestPointon;
+	struct vec3 *bestDirect;
+        for (int i=0; i < faces; i++){
+                norm = vecadd(vecmult(cos(i*6.283/faces), n0), vecmult(sin(i*6.283/faces),n1));
+                pointon = vecadd(vecmult(thickness, norm), base);
+                curdist = genSDFplane(norm, pointon,v,p);
+                directed = vecadd(p, vecmult(curdist, v));
+                b = vecsubtract(directed, pointon);
+                if (curdist == 1111.1) break;
+                if (curdist > max) {
+                        max = curdist;
+			bestNorm = norm;
+			bestB = b;
+			bestDirect = directed;
+                }
+        }
+	if (0 <= dot3(bestB, a) && dot3(bestB, a) <= height && abs(vecnorm(antiComponent(bestB,a))) <= facewidth/2) {
+		result->dist = max;
+		result->grad = bestNorm;
+		result->p = bestDirect;
+		return result;
+		
+	}
+        pointon = vecadd(base, vecmult(height, a));
+        curdist = genSDFplane(a, pointon, v, p);
+        if (max == 0 && curdist > max && curdist != 1111.1) {
+                directed = vecadd(p, vecmult(curdist, v));
+                for (int i=0; i < faces; i++) {
+                        norm = vecadd(vecmult(cos(i*6.283/faces), n0), vecmult(sin(i*6.283/faces),n1));
+                        if (dot3(vecsubtract(directed, pointon), norm) <= thickness) count ++;
+                        else break;
+                        }
+                if (count == faces) max = curdist;
+        }
+        count = 0;
+        pointon = base;
+        curdist = genSDFplane(vecmult(-1.0,a), pointon, v, p);
+        if (max == 0 && curdist > max && curdist != 1111.1) {
+                directed = vecadd(p, vecmult(curdist, v));
+                for (int i=0; i < faces; i++) {
+                        norm = vecadd(vecmult(cos(i*6.283/faces), n0), vecmult(sin(i*6.283/faces),n1));
+                        if (dot3(vecsubtract(directed, pointon), norm) <= thickness) count ++;
+                        else break;
+                        }
+                if (count == faces) max = curdist;
+        }
+
+        if (max == 0) max = 1111.1;
+
+
+        free(pointon);
+        free(norm);
+        free(n1);
+        return max;
+}*/
+
 struct vec3 *shade(struct Node *head, struct Camera *camera, struct SD *sd){
 	if (sd->dist == 1111.1) return newVec(0, 0, 0);
 	struct vec3 *grad = sd->gradient(sd->pos);
 	struct vec3 *lightnorm = normalize(vecsubtract(camera->light, sd->pos));
 	struct vec3 *lightv = vecmult(-1, lightnorm);
-	if (vecEq(sd->pos, calcSDF(head, lightv, camera->light)->pos)==0) return newVec(0, 0, 0);
+	struct SD *sdlight = calcSDF(head, lightv, camera->light);
+	if (vecEq(sd->pos, sdlight->pos)==0) return newVec(0, 0, 0);
+//	printf("matches");
 	double scale = dot3(grad, lightnorm);
 	if (scale < 0) scale = 0;
 	struct vec3 *shade = vecmult(scale, sd->color);
+	shade->x = round(shade->x);
+	shade->y = round(shade->y);
+	shade->z = round(shade->z);
+//	printf("scale = %f    shade = %f %f %f\n", scale, shade->x, shade->y, shade->z);
 	free(grad);
 	free(lightnorm);
 	free(sd);
 	return shade;
 }
 
+
 struct SD *calcSDF(struct Node *head, struct vec3 *v, struct vec3 *p){
 	struct Node *cur = head;
 	struct Node *minNode = head;
-	double min = 1111.1;
+	double min = head->shape->SDF(v,p);
 	while (cur->next != 0){
+	 	cur = cur->next;
 		if (cur->shape->SDF(v, p) < min) {
 			min = cur->shape->SDF(v, p);
 			minNode = cur;
+//			if (cur != head) printf("Cyl2 selected\n");
 		}
-		cur = cur->next;
 		
 	}
-	if (cur->shape->SDF(v, p) < min) {
-		min = cur->shape->SDF(v, p);
-		minNode = cur;
-		
-	}
+	
+//	if (head->shape->SDF(v,p) != 1111.1 && head->next->shape->SDF(v,p) != 1111.1 && head->next->shape->SDF(v,p) > head->shape->SDF(v,p)) printf("cone: %f and sph: %f\n", head->shape->SDF(v,p), head->next->shape->SDF(v,p));
 	struct SD *sd = malloc(sizeof(struct SD));
 	sd->dist = min;
 	sd->gradient = minNode->shape->gradSDF;
@@ -369,6 +499,51 @@ struct SD *calcSDF(struct Node *head, struct vec3 *v, struct vec3 *p){
 	free(direct);	
 	return sd;
 }
+
+/*struct vec3 *shade(struct Node *head, struct Camera *camera, struct SD *sd){
+        if (sd->dist == 1111.1) return newVec(0, 0, 0);
+        struct vec3 *lightnorm = normalize(vecsubtract(camera->light, sd->pos));
+        struct vec3 *lightv = vecmult(-1, lightnorm);
+        if (vecEq(sd->pos, calcSDF(head, lightv, camera->light)->pos)==0) return newVec(0, 0, 0);
+        double scale = dot3(sd->grad, lightnorm);
+        if (scale < 0) scale = 0;
+        struct vec3 *shade = vecmult(scale, sd->color);
+        shade->x = round(shade->x);
+        shade->y = round(shade->y);
+        shade->z = round(shade->z);
+        free(lightnorm);
+        free(sd);
+        return shade;
+}
+
+struct SD *calcSDF(struct Node *head, struct vec3 *v, struct vec3 *p){
+        struct Node *cur = head;
+        struct Node *minNode = head;
+	struct contact *minCont = head->shape->eval(v,p);
+	printf("dis = %f\n", minCont->dist);
+        double min = minCont->dist;
+	struct vec3 *minGrad = minCont->grad;
+        while (cur->next != 0){
+                cur = cur->next;
+                if (cur->shape->eval(v, p)->dist < min) {
+                        minCont = cur->shape->eval(v, p);
+			min = minCont->dist;
+			minNode = cur;
+//                      if (cur != head) printf("Cyl2 selected\n");
+                }
+                
+        }
+        
+//      printf("cyl1: %f and cyl2: %f\n", head->shape->SDF(v,p), head->next->shape->SDF(v,p));
+        struct SD *sd = malloc(sizeof(struct SD));
+        sd->dist = min;
+        sd->grad = minCont->grad;
+        sd->color = minNode->shape->color;
+        struct vec3 *direct = vecmult(min, v);
+        sd->pos = vecadd(p, direct);
+        free(direct);   
+        return sd;
+}*/
 
 void newNode(struct Node *head, struct Shape *shape){
 	struct Node *cur = head;
@@ -390,7 +565,6 @@ struct Shape *newShape(struct vec3 *color){
 
 int Render(struct Node *head, struct Camera *camera, double hsteps, double vsteps, FILE *fp){
 	//fprintf(fp, "a");
-	printf("MadeItHere\n");
 	struct vec3 *sheetpoint;
 	struct vec3 *k = vecsubtract(camera->corner[1], camera->corner[0]);
 	struct vec3 *h = vecsubtract(camera->corner[3], camera->corner[0]);
@@ -403,11 +577,9 @@ int Render(struct Node *head, struct Camera *camera, double hsteps, double vstep
 	struct vec3 *pointon;
 	struct vec3 *lightvec;
 	struct vec3 * grad;
-	//fprintf(fp, "[");
 	for (int i = 0; i < vsteps; i ++){
 		hraw = vecmult(((double) i)/((double) vsteps), h);
 		hnow = vecadd(hraw, camera->corner[0]);
-		//fprintf(fp, "[");
 		free(hraw);
 		for (int j = 0; j < hsteps; j++){
 			know = vecmult(((double) j)/((double) hsteps), k);
@@ -415,29 +587,16 @@ int Render(struct Node *head, struct Camera *camera, double hsteps, double vstep
 			v = normalize(vecsubtract(sheetpoint, camera->focus));
 			sdcur = calcSDF(head, v, camera->focus);
 			pointon = vecadd(camera->focus, vecmult(sdcur->dist, v));
-			grad = sdcur->gradient(pointon);
+			grad = sdcur->grad;
 			double dis = sdcur->dist;
 			lightvec = normalize(vecsubtract(camera->light, sdcur->pos));
 			curcolor = shade(head, camera, sdcur);
-			//if (dis != 1111.1 && curcolor->x == 0) printf("%f, %f, %f at %f, %f, %f\n", grad->x, grad->y, grad->z, pointon->x, pointon->y, pointon->z);
+//			if (dis != 1111.1 && curcolor->x == 0) printf("%f, %f, %f at %f, %f, %f\n", grad->x, grad->y, grad->z, pointon->x, pointon->y, pointon->z);
 //			if (dis != 1111.1) printf("%f\n", pointon->z);
 			if (j == 0) fprintf(fp, "%f,%f,%f", curcolor->x, curcolor->y, curcolor->z);
 			else fprintf(fp, ";%f,%f,%f", curcolor->x, curcolor->y, curcolor->z);
-			//if (curcolor->y != 0) printf("o");
-			//else printf(" ");
-			//printf("%f\n", curcolor->y);
-			//if (curcolor->y != 0 && !isnan(curcolor->y)) printf("o %f,%f,%f\n", pointon->x, pointon->y, pointon->z);
-			//if ((curcolor->y)==0) printf("* %f,%f,%f\n", pointon->x, pointon->y, pointon->z);
-                        //if (curcolor->y != 0 && !isnan(curcolor->y)) printf("o ");
-			//else printf("* ");
 			if (dis != 1111.1) printf("* ");
                         else printf("  ");
-			//else printf("\n. point on: %f, %f, %f   gradient: %f, %f, %f   light: %f, %f, %f  dot: %f\n", pointon->x, pointon->y, pointon->z, grad->x, grad->y, grad->z, lightvec->x, lightvec->y, lightvec->z, dot3(grad, lightvec));
-			//else printf(". ");
-			//free(sheetpoint);
-			//free(know);
-			//free(v);
-			//free(curcolor);
 		}
 		printf("\n");
 		fprintf(fp, ";\n");
@@ -450,5 +609,4 @@ int Render(struct Node *head, struct Camera *camera, double hsteps, double vstep
 	free(k);
 	return 0;
 }
-
 
