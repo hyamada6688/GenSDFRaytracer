@@ -28,6 +28,6 @@ shape1->next = shape2;    //set shape2 to be the "next" of shape1
 
 
 The bash executable ./execute.sh (pixel width) (pixel height) can be used to compile and
-run the code. The result is a .ppm image.
-  
+run the code. It stores the resulting image in data/P.ppm.
+
 Some sample renders can be found in the Renders folder.
