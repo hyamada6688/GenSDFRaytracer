@@ -17,7 +17,14 @@ often call functions in renderFuncs.c).
 
 render.c contains the main function, defining positions for the "camera" and shape,
 and rendering the image. The SDFs and gradient functions chosen here are those defined 
-in shapes.c.
+in shapes.c. To render multiple shapes in the same image, a linked list is used. To define
+multiple shapes, set the "next" atttribute to another "node":
+
+struct node *shape2 = malloc(sizeof(struct node));
+.
+.
+.  //initialize the shape with an RGB color and SDF, gradient chosen from shapes.c
+shape1->next = shape2;    //set shape2 to be the "next" of shape1
 
 
 The bash executable ./execute.sh <pixel width> <pixel height> can be used to compile and
