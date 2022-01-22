@@ -1,6 +1,6 @@
 # GenSDFRaytracer
 An implementation of a Raytracer, using generalized SDFs (signed distance functions),
-written in C, with images being rendered with Python PIL.
+written in C.
 
 
 Source code, executables and a makefile can be found in the src directory. 
@@ -28,7 +28,6 @@ shape1->next = shape2;    //set shape2 to be the "next" of shape1
 
 
 The bash executable ./execute.sh (pixel width) (pixel height) can be used to compile and
-run the code. The result is a temporary file of a rendered image, whose bitmap is saved 
-in data/small.csv. 
+run the code. The result is a .ppm image.
   
 Some sample renders can be found in the Renders folder.
